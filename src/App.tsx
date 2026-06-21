@@ -94,7 +94,7 @@ export function App() {
               Live pump.fun discovery — reawakened old pre-bond coins, fresh launches, and bonded graduates, filtered by transparent on-chain quality gates.
             </p>
             <p style={{ margin: '14px 0 0', fontSize: 12.5, fontWeight: 600, lineHeight: 1.55, color: '#7dd3fc', textShadow: '0 0 14px rgba(125,211,252,0.65)' }}>
-              The data is not real-time, to keep API costs low. It’s open-source — add your own API keys for the real-time build.
+              The data might not be 100% real-time — there’s a slight delay to keep API costs low. It’s open-source: add your own API keys for the real-time build.
             </p>
             <button onClick={() => setShowIntro(false)}
               style={{ marginTop: 18, padding: '9px 24px', borderRadius: 999, background: '#e5e7eb', color: '#0a0a0f', fontSize: 13, fontWeight: 800, border: 'none', cursor: 'pointer' }}>
