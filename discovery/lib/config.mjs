@@ -58,11 +58,13 @@ export const config = {
     maxPerScan: num('OLD_MAX_PER_SCAN', 12),
   },
 
-  // Bonded (postbond). trackMs = active live-tracking window; after that a coin
-  // goes "stale" (kept, frozen, shown in the Stale tab) until staleMs, then dropped.
+  // Bonded (postbond). A coin stays Tradable (live mcap) as long as it's alive;
+  // it only goes "stale" when it's DEAD — below staleMcUsd or cratered. Coins are
+  // kept in the board up to keepMs (memory bound), tracked the whole time.
   bonded: {
     trackMs: num('BONDED_TRACK_MS', 60 * 60 * 1000),
-    staleMs: num('BONDED_STALE_MS', 24 * 60 * 60 * 1000),
+    staleMs: num('BONDED_STALE_MS', 24 * 60 * 60 * 1000), // hard keep window (drop after this)
+    staleMcUsd: num('BONDED_STALE_MC_USD', 3000),         // below this mcap => dead => Stale tab
     earlyWindowMs: num('BONDED_EARLY_WINDOW_MS', 60_000),
   },
 

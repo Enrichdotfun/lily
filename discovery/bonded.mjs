@@ -36,12 +36,19 @@ function hideReason(c) {
   return null;
 }
 
+// "stale" = a DEAD coin: cratered, or its mcap has fallen below the floor. NOT
+// based on age — a good coin stays Tradable (with live mcap) however long it lives.
+function staleVerdict(c) {
+  if (isCratered(c.dipPct)) return true;
+  if (c.marketCapUsd != null && c.marketCapUsd < B.staleMcUsd) return true;
+  return false;
+}
+
 function flush() {
   const now = Date.now();
   for (const [mint, c] of board) {
-    const age = now - c.bondedAt;
-    if (age > B.staleMs) { board.delete(mint); portal.unwatchTrades(mint); continue; } // final drop after the stale window
-    if (age > B.trackMs && !c.stale) { c.stale = true; portal.unwatchTrades(mint); }    // aged out of active tracking -> keep as stale
+    if (now - c.bondedAt > B.staleMs) { board.delete(mint); portal.unwatchTrades(mint); continue; } // hard keep-window cap
+    c.stale = staleVerdict(c); // dead coin (cratered / below mcap floor) -> Stale; good coins stay Tradable
   }
   const rows = [...board.values()].map((c) => {
     const hr = hideReason(c);
@@ -253,11 +260,14 @@ setInterval(() => {
   }
 }, 8000);
 
-// Keep live mcap/dip current for surfaced coins (gate retry above only covers
-// unchecked ones). Skip blocked coins — no need to track them live.
+// Keep mcap/dip current for all surfaced (non-blocked) coins — good ones stay
+// Tradable with live mcaps, and a coin that fell to Stale can recover if it climbs
+// back over the floor. Rate-capped (oldest-refreshed first) to bound API cost.
 setInterval(() => {
   const now = Date.now();
-  for (const c of board.values()) {
-    if (c.checked && !c.gating && !c.stale && hideReason(c) == null && now - (c.mcapAt || 0) > 30000) refreshMcap(c);
-  }
-}, 10000);
+  const due = [...board.values()]
+    .filter((c) => c.checked && !c.gating && hideReason(c) == null && now - (c.mcapAt || 0) > 30000)
+    .sort((a, b) => (a.mcapAt || 0) - (b.mcapAt || 0))
+    .slice(0, 30);
+  for (const c of due) refreshMcap(c);
+}, 8000);
