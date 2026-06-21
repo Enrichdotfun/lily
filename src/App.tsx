@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFeed, useTokenMeta } from './api';
 import type { OldCoin, BondedCoin, TokenMeta } from './api';
 import { Column } from './components/Column';
@@ -15,6 +15,19 @@ function sortCoins<T>(coins: T[], key: SortKey, dir: SortDir, val: (c: T, k: Sor
   return dir === 'desc' ? s.reverse() : s;
 }
 
+/** True on phone-width viewports — drives the columns-to-tabs collapse. */
+function useIsMobile(maxWidth = 760) {
+  const q = `(max-width: ${maxWidth}px)`;
+  const [m, setM] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(q);
+    const fn = () => setM(mq.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, [q]);
+  return m;
+}
+
 export function App() {
   const oldFeed = useFeed<OldCoin>('/api/old');
   const newFeed = useFeed<BondedCoin>('/api/new');
@@ -25,6 +38,8 @@ export function App() {
   const [bondSort, setBondSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'age', dir: 'asc' });
   const [newTab, setNewTab] = useState<'unchecked' | 'tradable' | 'blocked'>('tradable');
   const [bondTab, setBondTab] = useState<'unchecked' | 'tradable' | 'blocked'>('tradable');
+  const [mobileTab, setMobileTab] = useState<'old' | 'new' | 'bonded'>('new');
+  const isMobile = useIsMobile();
 
   const oldCoins = oldFeed.data?.coins ?? [];
   // New pairs and Bonded share the same flow:
@@ -71,14 +86,35 @@ export function App() {
           <img src={`${import.meta.env.BASE_URL}lily.png`} alt="" width={24} height={24} style={{ borderRadius: 6, objectFit: 'cover' }} />
           Lily
         </h1>
-        <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.55)' }}>live pump.fun token discovery · accurate on-chain stats only</span>
+        {!isMobile && <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.55)' }}>live pump.fun token discovery · accurate on-chain stats only</span>}
         {bondedFeed.data?.solUsd ? (
           <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'rgba(148,163,184,0.6)' }}>SOL ${bondedFeed.data.solUsd.toFixed(2)}</span>
         ) : null}
       </header>
 
-      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      {isMobile ? (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          {([
+            { key: 'old', label: 'Old', count: oldCoins.length, accent: 'rgba(251,191,36,0.9)' },
+            { key: 'new', label: 'New', count: newAll.length, accent: 'rgba(125,211,252,0.9)' },
+            { key: 'bonded', label: 'Bonded', count: bondAll.length, accent: 'rgba(74,222,128,0.9)' },
+          ] as const).map((t) => {
+            const on = mobileTab === t.key;
+            return (
+              <button key={t.key} onClick={() => setMobileTab(t.key)}
+                style={{ flex: 1, fontSize: 12, fontWeight: 700, padding: '8px 6px', borderRadius: 8, cursor: 'pointer',
+                  color: on ? '#0a0a0f' : 'rgba(203,213,225,0.85)', background: on ? t.accent : 'rgba(148,163,184,0.08)',
+                  border: '1px solid rgba(148,163,184,0.14)' }}>
+                {t.label} <span style={{ opacity: 0.7 }}>{t.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: isMobile ? 0 : 10 }}>
         {/* ---------- OLD PRE-BOND ---------- */}
+        <div style={{ display: isMobile && mobileTab !== 'old' ? 'none' : 'contents' }}>
         <Column
           title="Old pre-bond" accent="rgba(251,191,36,0.9)"
           subtitle="Older, still-unbonded coins taking fresh bids again."
@@ -97,8 +133,10 @@ export function App() {
           ))}
           {oldCoins.length === 0 ? <Empty /> : null}
         </Column>
+        </div>
 
         {/* ---------- NEW PAIRS (Unchecked | Blocked | Tradable) ---------- */}
+        <div style={{ display: isMobile && mobileTab !== 'new' ? 'none' : 'contents' }}>
         <Column
           title="New pairs" accent="rgba(125,211,252,0.9)"
           subtitle={
@@ -133,8 +171,10 @@ export function App() {
           })}
           {newActive.length === 0 ? <Empty hint="waiting for fresh launches…" /> : null}
         </Column>
+        </div>
 
         {/* ---------- BONDED (Unchecked | Tradable) ---------- */}
+        <div style={{ display: isMobile && mobileTab !== 'bonded' ? 'none' : 'contents' }}>
         <Column
           title="Bonded" accent="rgba(74,222,128,0.9)"
           subtitle={
@@ -169,6 +209,7 @@ export function App() {
           })}
           {bondActive.length === 0 ? <Empty hint="waiting for the next migration…" /> : null}
         </Column>
+        </div>
       </div>
     </div>
   );
