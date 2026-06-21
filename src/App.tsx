@@ -40,6 +40,7 @@ export function App() {
   const [bondTab, setBondTab] = useState<'unchecked' | 'tradable' | 'blocked'>('tradable');
   const [mobileTab, setMobileTab] = useState<'old' | 'new' | 'bonded'>('new');
   const isMobile = useIsMobile();
+  const [showIntro, setShowIntro] = useState(true);
 
   const oldCoins = oldFeed.data?.coins ?? [];
   // New pairs and Bonded share the same flow:
@@ -77,6 +78,26 @@ export function App() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: 12, boxSizing: 'border-box', background: '#07070b' }}>
+      {showIntro && (
+        <div onClick={() => setShowIntro(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(5px)' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(460px, 100%)', background: '#0c0c12', border: '1px solid rgba(148,163,184,0.18)', borderRadius: 16, padding: 26, color: '#e5e7eb', textAlign: 'center', boxShadow: '0 28px 80px rgba(0,0,0,0.55)' }}>
+            <img src={`${import.meta.env.BASE_URL}lily.png`} alt="" width={48} height={48} style={{ borderRadius: 12, objectFit: 'cover' }} />
+            <h2 style={{ margin: '12px 0 0', fontSize: 18, fontWeight: 800 }}>Lily — token discovery</h2>
+            <p style={{ margin: '8px 0 0', fontSize: 13, color: 'rgba(148,163,184,0.8)', lineHeight: 1.5 }}>
+              Live pump.fun discovery — reawakened old pre-bond coins, fresh launches, and bonded graduates, filtered by transparent on-chain quality gates.
+            </p>
+            <p style={{ margin: '14px 0 0', fontSize: 12.5, fontWeight: 600, lineHeight: 1.55, color: '#7dd3fc', textShadow: '0 0 14px rgba(125,211,252,0.65)' }}>
+              The data is not real-time, to keep API costs low. It’s open-source — add your own API keys for the real-time build.
+            </p>
+            <button onClick={() => setShowIntro(false)}
+              style={{ marginTop: 18, padding: '9px 24px', borderRadius: 999, background: '#e5e7eb', color: '#0a0a0f', fontSize: 13, fontWeight: 800, border: 'none', cursor: 'pointer' }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       <header style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
         <a href="/" title="Back to Enrich"
           style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(148,163,184,0.8)', textDecoration: 'none', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 8, padding: '4px 10px', whiteSpace: 'nowrap' }}>
@@ -165,7 +186,7 @@ export function App() {
               <CoinCard key={c.mint} mint={c.mint} symbol={c.symbol} meta={mm(c.mint)}
                 ticker={c.symbol || c.mint.slice(0, 6)} name={c.name} age={c.ageMs} mcapUsd={c.marketCapUsd}
                 secondary={[{ label: 'V', value: fmtUsd(c.volumeUsd) }, { label: 'TX', value: String(c.trades) }]}
-                stats={stats} pill={c.hidden ? { label: 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : c.revived ? { label: 'revival', tone: 'info' } : { label: 'tradable', tone: 'good' }}
+                stats={stats} pill={c.hidden ? { label: 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : c.revived ? { label: 'revival', tone: 'info' } : (c.marketCapUsd ?? 0) >= NEW_TRADABLE_MIN_MC ? { label: 'tradable', tone: 'good' } : { label: 'clean', tone: 'muted' }}
               />
             );
           })}

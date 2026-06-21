@@ -3,5 +3,5 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "redirects": [{ "source": "/", "destination": "/lily/app/", "permanent": false }]
+  "redirects": [{ "source": "/", "destination": "/lilytokendiscovery/app/", "permanent": false }]
 }
