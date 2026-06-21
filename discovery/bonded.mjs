@@ -53,6 +53,8 @@ function flush() {
       volumeSol: c.volumeSol,
       athMcapSol: c.athLevel,
       lastMcapSol: c.lastLevel,
+      marketCapSol: c.lastLevel,
+      marketCapUsd: c.marketCapUsd ?? null,
       dipPct: c.dipPct,
       maxDipPct: c.maxDipPct,
       reached: c.reached,
@@ -87,6 +89,7 @@ async function gateCoin(c) {
     const meta = await getCoin(c.mint).catch(() => null);
     c.name = c.name || meta?.name || null;
     c.symbol = c.symbol || meta?.symbol || null;
+    applyMcap(c, meta); // post-bond trades don't stream, so mcap comes from the API
     const pda = bondingCurvePda(c.mint);
     const launch = await launchTxnStats(rpc, pda, 20).catch(() => null);
     if (launch) {
@@ -109,6 +112,29 @@ async function gateCoin(c) {
     c.checked = c.holderTop1 != null;
   }
   flush();
+}
+
+// Post-migration trades don't come through subscribeTokenTrade, so the live trade
+// tape (onTrade) is usually empty for bonded coins. Pull mcap/dip from the pump.fun
+// API instead — getCoin exposes both market_cap (SOL) and usd_market_cap.
+function applyMcap(c, meta) {
+  c.mcapAt = Date.now();
+  if (!meta) return;
+  if (meta.marketCapUsd != null) c.marketCapUsd = meta.marketCapUsd;
+  const level = meta.marketCapSol;
+  if (level == null) return;
+  if (c.firstLevel == null) c.firstLevel = level;
+  if (c.athLevel == null || level > c.athLevel) c.athLevel = level;
+  c.lastLevel = level;
+  if (c.athLevel) {
+    c.dipPct = (level / c.athLevel - 1) * 100;
+    if (c.dipPct < c.maxDipPct) c.maxDipPct = c.dipPct;
+  }
+}
+
+async function refreshMcap(c) {
+  c.mcapAt = Date.now();
+  applyMcap(c, await getCoin(c.mint).catch(() => null));
 }
 
 function onTrade(c, m) {
@@ -191,3 +217,12 @@ setInterval(() => {
     if (!c.checked && !c.gating && now - (c.lastGate || 0) > 15000) gateCoin(c);
   }
 }, 8000);
+
+// Keep live mcap/dip current for surfaced coins (gate retry above only covers
+// unchecked ones). Skip blocked coins — no need to track them live.
+setInterval(() => {
+  const now = Date.now();
+  for (const c of board.values()) {
+    if (c.checked && !c.gating && hideReason(c) == null && now - (c.mcapAt || 0) > 30000) refreshMcap(c);
+  }
+}, 10000);
