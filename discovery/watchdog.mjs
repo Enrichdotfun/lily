@@ -20,8 +20,10 @@ import { getCoins } from './lib/db.mjs';
 
 const W = config.watchdog;
 const rpc = makeRpc(config.rpcUrl);
-const lastChecked = new Map(); // mint -> ts of last verification
-const quarantine = new Map();  // mint -> { reason, at, feed, ... }
+const lastChecked = new Map();    // mint -> ts of last verification
+const quarantine = new Map();     // mint -> { reason, at, feed, ... }
+const revivals = new Map();       // mint -> { at, feed, mcUsd, top1, ... } bundle-sold + near-launch
+const revivalChecked = new Map(); // mint -> ts of last revival scan
 let verified = 0;
 
 function feedCoins(feed) {
@@ -85,6 +87,42 @@ async function verify(c, feed) {
   return reason;
 }
 
+/** Coins that were a BUNDLED launch (slot-clustered) — revival candidates. */
+function bundledCandidates() {
+  const out = [];
+  for (const feed of ['new', 'bonded']) {
+    for (const c of feedCoins(feed)) {
+      if (bundleVerdict({ maxPerSlot: c.maxPerSlot })) out.push([c, feed]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Scan one bundled coin for the "second revival": its bundle has SOLD (holders are
+ * clean again) AND it's fallen back to near launch mcap. If so it's no longer a
+ * bundle risk — the server un-blocks it and re-baselines (dip reset) so we evaluate
+ * it from this reset point, not the original bundled pump.
+ */
+async function scanRevival(c, feed) {
+  revivalChecked.set(c.mint, Date.now());
+  const meta = await getCoin(c.mint).catch(() => null);
+  const mcUsd = meta?.marketCapUsd ?? c.marketCapUsd ?? null;
+  const holders = await mineHolders(rpc, c.mint, meta?.creator).catch(() => ({}));
+  const top1 = holders.holderTop1 ?? null;
+  const creatorPct = holders.creatorPct ?? null;
+  const bundleSold = top1 != null && holderVerdict({ creatorPct, holderTop1: top1 }) == null;
+  const nearLaunch = mcUsd != null && mcUsd <= W.revivalMaxMcUsd;
+  if (bundleSold && nearLaunch) {
+    if (!revivals.has(c.mint)) {
+      console.log(`[watchdog] REVIVAL ${feed} ${c.symbol || c.mint.slice(0, 8)} — bundle sold + back near launch (top1=${top1.toFixed(1)}% mc=$${Math.round(mcUsd)})`);
+    }
+    revivals.set(c.mint, { at: Date.now(), feed, symbol: c.symbol ?? null, mcUsd, top1, creatorPct, baselineMcUsd: mcUsd });
+  } else {
+    revivals.delete(c.mint); // bundle still held, or it has run past launch again
+  }
+}
+
 async function tick() {
   const now = Date.now();
   const tradable = [
@@ -105,6 +143,16 @@ async function tick() {
   const falseBlocks = auditBlocked();
   if (falseBlocks.length) console.log(`[watchdog] ${falseBlocks.length} FALSE-BLOCK(s), e.g. ${falseBlocks[0].symbol || falseBlocks[0].mint.slice(0, 8)} (${falseBlocks[0].reason}; ${falseBlocks[0].note})`);
 
+  // Revival scan: bundled launches whose bundle has sold + back near launch mcap.
+  const cands = bundledCandidates();
+  const dueR = cands
+    .filter(([c]) => now - (revivalChecked.get(c.mint) || 0) > W.revivalRecheckMs)
+    .slice(0, W.revivalPerTick);
+  for (const [c, feed] of dueR) { try { await scanRevival(c, feed); } catch { /* keep going */ } }
+  const allLive = new Set([...feedCoins('new'), ...feedCoins('bonded')].map((c) => c.mint));
+  for (const m of [...revivals.keys()]) if (!allLive.has(m)) revivals.delete(m);
+  for (const m of [...revivalChecked.keys()]) if (!allLive.has(m)) revivalChecked.delete(m);
+
   writeSnapshot('watchdog.json', {
     lastRun: now,
     tradableCount: tradable.length,
@@ -114,6 +162,8 @@ async function tick() {
     quarantine: [...quarantine.keys()],
     falseBlockCount: falseBlocks.length,
     falseBlocks: falseBlocks.slice(0, 50),
+    revivalCount: revivals.size,
+    revivals: [...revivals.entries()].map(([mint, v]) => ({ mint, ...v })),
   });
 }
 

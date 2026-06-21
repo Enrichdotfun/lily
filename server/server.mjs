@@ -70,6 +70,7 @@ async function buildFeed(feed) {
   // drop out of Tradable within seconds (independent safety net).
   const wd = readSnapshot('watchdog.json');
   const quarantine = new Map((wd?.leaks || []).map((l) => [l.mint, l.reason]));
+  const revived = new Set((wd?.revivals || []).map((r) => r.mint)); // bundle sold + near launch
   const body = {
     updatedAt: meta?.updatedAt ?? 0,
     ws: meta?.ws,
@@ -81,6 +82,13 @@ async function buildFeed(feed) {
       const e = enrichCoin(c, solUsd);
       const qr = quarantine.get(e.mint);
       if (qr) { e.hidden = true; e.hideReason = e.hideReason || `watchdog:${qr}`; }
+      else if (revived.has(e.mint)) {
+        // bundle sold + back near launch: un-block and re-baseline (scan from the
+        // second revival, not the original bundled pump — so the old crash/crater
+        // no longer hides it).
+        e.hidden = false; e.hideReason = null; e.bundled = false;
+        e.dipPct = 0; e.maxDipPct = 0; e.revived = true;
+      }
       return e;
     }),
   };

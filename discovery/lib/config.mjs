@@ -75,12 +75,18 @@ export const config = {
     gatePerTick: num('NEWPAIRS_GATE_PER_TICK', 10), // max coins gated per 5s loop (RPC budget)
   },
 
-  // Watchdog: 24/7 independent re-verification of every Tradable coin (no leaks).
+  // Watchdog: 24/7 independent re-verification of every Tradable coin (no leaks)
+  // + revival scan (bundled launch whose bundle has SOLD and is back near launch).
   watchdog: {
     tickMs: num('WATCHDOG_TICK_MS', 10_000),
     recheckMs: num('WATCHDOG_RECHECK_MS', 60_000), // re-verify each tradable coin at most this often
     perTick: num('WATCHDOG_PER_TICK', 5),          // RPC budget per tick
     tradableMinMcUsd: num('WATCHDOG_TRADABLE_MIN_MC', 3000),
+    // revival: a bundled coin counts as "second revival" once its bundle has sold
+    // (holders clean again) AND it's fallen back to near launch mcap.
+    revivalMaxMcUsd: num('WATCHDOG_REVIVAL_MAX_MC', 12000), // "near launch" ceiling
+    revivalRecheckMs: num('WATCHDOG_REVIVAL_RECHECK_MS', 120_000),
+    revivalPerTick: num('WATCHDOG_REVIVAL_PER_TICK', 3),
   },
 };
 

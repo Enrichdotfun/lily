@@ -33,6 +33,7 @@ export type BondedCoin = {
   checked: boolean;
   hidden: boolean;
   hideReason: string | null;
+  revived?: boolean; // bundled launch whose bundle sold + reset near launch (watchdog)
 };
 
 type Feed<T> = {
