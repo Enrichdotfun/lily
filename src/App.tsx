@@ -127,7 +127,7 @@ export function App() {
               <CoinCard key={c.mint} mint={c.mint} symbol={c.symbol} meta={mm(c.mint)}
                 ticker={c.symbol || c.mint.slice(0, 6)} name={c.name} age={c.ageMs} mcapUsd={c.marketCapUsd}
                 secondary={[{ label: 'V', value: fmtUsd(c.volumeUsd) }, { label: 'TX', value: String(c.trades) }]}
-                stats={stats} pill={c.hidden ? { label: c.hideReason || 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : { label: 'tradable', tone: 'good' }}
+                stats={stats} pill={c.hidden ? { label: 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : { label: 'tradable', tone: 'good' }}
               />
             );
           })}
@@ -163,7 +163,7 @@ export function App() {
               <CoinCard key={c.mint} mint={c.mint} symbol={c.symbol} meta={mm(c.mint)}
                 ticker={c.symbol || c.mint.slice(0, 6)} name={c.name} age={c.ageMs} mcapUsd={c.marketCapUsd}
                 secondary={[{ label: 'V', value: fmtUsd(c.volumeUsd) }, { label: 'TX', value: String(c.trades) }]}
-                stats={stats} pill={c.hidden ? { label: c.hideReason || 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : { label: 'tradable', tone: 'good' }}
+                stats={stats} pill={c.hidden ? { label: 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : { label: 'tradable', tone: 'good' }}
               />
             );
           })}
