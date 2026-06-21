@@ -37,7 +37,7 @@ export function App() {
   const [newSort, setNewSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'age', dir: 'asc' });
   const [bondSort, setBondSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'age', dir: 'asc' });
   const [newTab, setNewTab] = useState<'unchecked' | 'tradable' | 'blocked'>('tradable');
-  const [bondTab, setBondTab] = useState<'unchecked' | 'tradable' | 'blocked'>('tradable');
+  const [bondTab, setBondTab] = useState<'unchecked' | 'tradable' | 'blocked' | 'stale'>('tradable');
   const [mobileTab, setMobileTab] = useState<'old' | 'new' | 'bonded'>('new');
   const isMobile = useIsMobile();
   const [showIntro, setShowIntro] = useState(true);
@@ -58,10 +58,15 @@ export function App() {
   const newActive = newTab === 'unchecked' ? newUnchecked : newTab === 'blocked' ? newBlocked : newTradable;
 
   const bondAll = bondedFeed.data?.coins ?? [];
-  const bondBlocked = bondAll.filter((c) => c.hidden);
-  const bondTradable = bondAll.filter((c) => c.checked && !c.hidden);
-  const bondUnchecked = bondAll.filter((c) => !c.checked && !c.hidden);
-  const bondActive = bondTab === 'unchecked' ? bondUnchecked : bondTab === 'blocked' ? bondBlocked : bondTradable;
+  // Stale = aged out of active tracking; kept here, excluded from the live tabs.
+  const bondStale = bondAll.filter((c) => c.stale);
+  const bondBlocked = bondAll.filter((c) => !c.stale && c.hidden);
+  const bondTradable = bondAll.filter((c) => !c.stale && c.checked && !c.hidden);
+  const bondUnchecked = bondAll.filter((c) => !c.stale && !c.checked && !c.hidden);
+  const bondActive = bondTab === 'unchecked' ? bondUnchecked
+    : bondTab === 'blocked' ? bondBlocked
+    : bondTab === 'stale' ? bondStale
+    : bondTradable;
 
   const oldSorted = sortCoins(oldCoins, oldSort.key, oldSort.dir,
     (c, k) => k === 'age' ? c.ageMs : k === 'mc' ? (c.marketCapUsd ?? 0) : c.recentTrades);
@@ -201,6 +206,7 @@ export function App() {
           subtitle={
             bondTab === 'unchecked' ? 'Fresh graduates still being checked.'
             : bondTab === 'blocked' ? 'Graduates that tripped a gate (bundle / rug / dump / crater).'
+            : bondTab === 'stale' ? 'Aged-out graduates — no longer tracked live, kept for reference.'
             : 'Graduates that passed every gate (bundle / rug / dump).'}
           count={bondActive.length} apiLoad={bondedFeed.data?.api}
           status={feedStatus(bondedFeed.data?.updatedAt, bondedFeed.error)}
@@ -211,8 +217,9 @@ export function App() {
             { key: 'unchecked', label: 'Unchecked', count: bondUnchecked.length },
             { key: 'blocked', label: 'Blocked', count: bondBlocked.length },
             { key: 'tradable', label: 'Tradable', count: bondTradable.length },
+            { key: 'stale', label: 'Stale', count: bondStale.length },
           ]}
-          activeTab={bondTab} onTab={(k) => setBondTab(k as 'unchecked' | 'tradable' | 'blocked')}
+          activeTab={bondTab} onTab={(k) => setBondTab(k as 'unchecked' | 'tradable' | 'blocked' | 'stale')}
         >
           {bondSorted.map((c) => {
             const stats: Stat[] = [
@@ -224,7 +231,7 @@ export function App() {
               <CoinCard key={c.mint} mint={c.mint} symbol={c.symbol} meta={mm(c.mint)}
                 ticker={c.symbol || c.mint.slice(0, 6)} name={c.name} age={c.ageMs} mcapUsd={c.marketCapUsd}
                 secondary={[{ label: 'V', value: fmtUsd(c.volumeUsd) }, { label: 'TX', value: String(c.trades) }]}
-                stats={stats} pill={c.hidden ? { label: 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : c.revived ? { label: 'revival', tone: 'info' } : { label: 'tradable', tone: 'good' }}
+                stats={stats} pill={c.stale ? { label: 'stale', tone: 'muted' } : c.hidden ? { label: 'blocked', tone: 'bad' } : !c.checked ? { label: 'checking…', tone: 'warn' } : c.revived ? { label: 'revival', tone: 'info' } : { label: 'tradable', tone: 'good' }}
               />
             );
           })}

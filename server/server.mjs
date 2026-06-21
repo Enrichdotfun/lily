@@ -13,7 +13,7 @@ import { getCoins, getFeedMeta } from '../discovery/lib/db.mjs';
 
 const FEEDS = {
   old: { file: 'old.json', freshMs: config.old.activeMs * 2 },
-  bonded: { file: 'bonded.json', freshMs: config.bonded.trackMs },
+  bonded: { file: 'bonded.json', freshMs: config.bonded.staleMs },
   new: { file: 'new.json', freshMs: config.newPairs.trackMs },
 };
 

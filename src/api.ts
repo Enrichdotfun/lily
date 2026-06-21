@@ -34,6 +34,7 @@ export type BondedCoin = {
   hidden: boolean;
   hideReason: string | null;
   revived?: boolean; // bundled launch whose bundle sold + reset near launch (watchdog)
+  stale?: boolean;   // aged out of active tracking — kept in the Stale tab
 };
 
 type Feed<T> = {

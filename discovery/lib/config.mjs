@@ -58,9 +58,11 @@ export const config = {
     maxPerScan: num('OLD_MAX_PER_SCAN', 12),
   },
 
-  // Bonded (postbond)
+  // Bonded (postbond). trackMs = active live-tracking window; after that a coin
+  // goes "stale" (kept, frozen, shown in the Stale tab) until staleMs, then dropped.
   bonded: {
     trackMs: num('BONDED_TRACK_MS', 60 * 60 * 1000),
+    staleMs: num('BONDED_STALE_MS', 24 * 60 * 60 * 1000),
     earlyWindowMs: num('BONDED_EARLY_WINDOW_MS', 60_000),
   },
 

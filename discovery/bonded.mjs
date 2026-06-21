@@ -39,7 +39,9 @@ function hideReason(c) {
 function flush() {
   const now = Date.now();
   for (const [mint, c] of board) {
-    if (now - c.bondedAt > B.trackMs) { board.delete(mint); portal.unwatchTrades(mint); }
+    const age = now - c.bondedAt;
+    if (age > B.staleMs) { board.delete(mint); portal.unwatchTrades(mint); continue; } // final drop after the stale window
+    if (age > B.trackMs && !c.stale) { c.stale = true; portal.unwatchTrades(mint); }    // aged out of active tracking -> keep as stale
   }
   const rows = [...board.values()].map((c) => {
     const hr = hideReason(c);
@@ -70,6 +72,7 @@ function flush() {
       creatorPct: c.creatorPct,
       hidden: hr != null,
       hideReason: hr,
+      stale: !!c.stale,
     };
   });
   const blocked = rows.filter((r) => r.hidden).length;
@@ -221,14 +224,14 @@ function hydrate(row, now) {
     earlyDumped: !!row.earlyDumped,
     holderTop1: row.holderTop1 ?? null, holderTop10: row.holderTop10 ?? null, creatorPct: row.creatorPct ?? null,
     checked: !!row.checked, gating: false, lastGate: 0, mcapAt: 0,
-    earlyClosed: true, earlyNet: 0, earlyEndLevel: null,
+    earlyClosed: true, earlyNet: 0, earlyEndLevel: null, stale: !!row.stale,
   };
 }
 try {
   const now = Date.now();
   let n = 0;
-  for (const row of getCoins('bonded', B.trackMs)) {
-    if (!row?.mint || board.has(row.mint) || now - (row.bondedAt ?? 0) > B.trackMs) continue;
+  for (const row of getCoins('bonded', B.staleMs)) {
+    if (!row?.mint || board.has(row.mint) || now - (row.bondedAt ?? 0) > B.staleMs) continue;
     board.set(row.mint, hydrate(row, now));
     n++;
   }
@@ -237,7 +240,7 @@ try {
 
 console.log('[bonded] streaming migrations from', config.wsUrl);
 portal.start();
-for (const c of board.values()) portal.watchTrades(c.mint); // resume tape for hydrated coins
+for (const c of board.values()) if (!c.stale) portal.watchTrades(c.mint); // resume tape for active (non-stale) hydrated coins
 flush();
 setInterval(flush, 4000);
 
@@ -246,7 +249,7 @@ setInterval(flush, 4000);
 setInterval(() => {
   const now = Date.now();
   for (const c of board.values()) {
-    if (!c.checked && !c.gating && now - (c.lastGate || 0) > 15000) gateCoin(c);
+    if (!c.checked && !c.gating && !c.stale && now - (c.lastGate || 0) > 15000) gateCoin(c);
   }
 }, 8000);
 
@@ -255,6 +258,6 @@ setInterval(() => {
 setInterval(() => {
   const now = Date.now();
   for (const c of board.values()) {
-    if (c.checked && !c.gating && hideReason(c) == null && now - (c.mcapAt || 0) > 30000) refreshMcap(c);
+    if (c.checked && !c.gating && !c.stale && hideReason(c) == null && now - (c.mcapAt || 0) > 30000) refreshMcap(c);
   }
 }, 10000);
