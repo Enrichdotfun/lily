@@ -66,6 +66,10 @@ async function buildFeed(feed) {
     if (snap) { coins = snap.coins || []; meta = snap; }
   }
   const solUsd = await getSolUsd();
+  // Watchdog quarantine: coins it flagged as unsafe are force-hidden so they
+  // drop out of Tradable within seconds (independent safety net).
+  const wd = readSnapshot('watchdog.json');
+  const quarantine = new Map((wd?.leaks || []).map((l) => [l.mint, l.reason]));
   const body = {
     updatedAt: meta?.updatedAt ?? 0,
     ws: meta?.ws,
@@ -73,7 +77,12 @@ async function buildFeed(feed) {
     stats: meta?.stats,
     scanner: meta?.scanner,
     solUsd,
-    coins: (coins || []).map((c) => enrichCoin(c, solUsd)),
+    coins: (coins || []).map((c) => {
+      const e = enrichCoin(c, solUsd);
+      const qr = quarantine.get(e.mint);
+      if (qr) { e.hidden = true; e.hideReason = e.hideReason || `watchdog:${qr}`; }
+      return e;
+    }),
   };
   cache.set(feed, { at: Date.now(), body });
   return body;
@@ -99,6 +108,7 @@ const server = http.createServer(async (req, res) => {
     const p = url.pathname;
     if (req.method === 'OPTIONS') return send(res, 204, {});
     if (p === '/api/health') return send(res, 200, { ok: true, time: Date.now() });
+    if (p === '/api/watchdog') return send(res, 200, readSnapshot('watchdog.json') || { lastRun: 0, tradableCount: 0, leakCount: 0, leaks: [], quarantine: [] });
 
     // rate limit + auth for everything else
     const id = (req.headers['x-api-key'] || url.searchParams.get('key') || req.socket.remoteAddress || 'anon');
@@ -121,5 +131,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(config.port, () => {
   console.log(`[api] http://localhost:${config.port}  keys:${API_KEYS.size ? 'on' : 'off'}  rate:${config.rateLimitPerMin}/min`);
-  console.log('      /api/old /api/new /api/bonded /api/token-meta /api/health');
+  console.log('      /api/old /api/new /api/bonded /api/token-meta /api/health /api/watchdog');
 });

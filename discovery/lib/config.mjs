@@ -74,6 +74,14 @@ export const config = {
     maxWatch: num('NEWPAIRS_MAX_WATCH', 300),       // rolling cap on tracked launches (newest win)
     gatePerTick: num('NEWPAIRS_GATE_PER_TICK', 10), // max coins gated per 5s loop (RPC budget)
   },
+
+  // Watchdog: 24/7 independent re-verification of every Tradable coin (no leaks).
+  watchdog: {
+    tickMs: num('WATCHDOG_TICK_MS', 10_000),
+    recheckMs: num('WATCHDOG_RECHECK_MS', 60_000), // re-verify each tradable coin at most this often
+    perTick: num('WATCHDOG_PER_TICK', 5),          // RPC budget per tick
+    tradableMinMcUsd: num('WATCHDOG_TRADABLE_MIN_MC', 3000),
+  },
 };
 
 // pump.fun public program + AMM/pool program ids (publicly known constants).

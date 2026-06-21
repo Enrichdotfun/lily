@@ -12,6 +12,7 @@ const SERVICES = [
   { name: 'old    ', file: 'discovery/old-prebond.mjs' },
   { name: 'new    ', file: 'discovery/new-pairs.mjs' },
   { name: 'bonded ', file: 'discovery/bonded.mjs' },
+  { name: 'watch  ', file: 'discovery/watchdog.mjs' },
 ];
 
 let shuttingDown = false;
