@@ -97,8 +97,8 @@ export function App() {
           onSortKey={(k) => setBondSort((s) => ({ ...s, key: k }))} onSortDir={(d) => setBondSort((s) => ({ ...s, dir: d }))}
           tabs={[
             { key: 'unchecked', label: 'Unchecked', count: bondUnchecked.length },
-            { key: 'tradable', label: 'Tradable', count: bondTradable.length },
             { key: 'blocked', label: 'Blocked', count: bondBlocked.length },
+            { key: 'tradable', label: 'Tradable', count: bondTradable.length },
           ]}
           activeTab={bondTab} onTab={(k) => setBondTab(k as 'unchecked' | 'tradable' | 'blocked')}
         >
