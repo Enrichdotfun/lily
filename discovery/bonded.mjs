@@ -260,14 +260,19 @@ setInterval(() => {
   }
 }, 8000);
 
-// Keep mcap/dip current for all surfaced (non-blocked) coins — good ones stay
-// Tradable with live mcaps, and a coin that fell to Stale can recover if it climbs
-// back over the floor. Rate-capped (oldest-refreshed first) to bound API cost.
+// Keep mcap/dip current. Good (tradable) coins refresh fast (~8s) so their mcaps
+// are live — the set is small, so this is cheap. Dead/stale coins refresh slowly
+// (~5min, just to catch a recovery). Blocked coins aren't refreshed. Oldest-first
+// + a per-tick cap bound the API cost.
 setInterval(() => {
   const now = Date.now();
   const due = [...board.values()]
-    .filter((c) => c.checked && !c.gating && hideReason(c) == null && now - (c.mcapAt || 0) > 30000)
+    .filter((c) => {
+      if (!c.checked || c.gating || hideReason(c) != null) return false;
+      const interval = c.stale ? 300_000 : 8_000;
+      return now - (c.mcapAt || 0) > interval;
+    })
     .sort((a, b) => (a.mcapAt || 0) - (b.mcapAt || 0))
-    .slice(0, 30);
+    .slice(0, 40);
   for (const c of due) refreshMcap(c);
-}, 8000);
+}, 4000);
