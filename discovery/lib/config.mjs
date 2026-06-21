@@ -64,15 +64,15 @@ export const config = {
     earlyWindowMs: num('BONDED_EARLY_WINDOW_MS', 60_000),
   },
 
-  // New pairs (pre-bond). Launches are a firehose, so cost is bounded by a watch
-  // cap + a traction gate (only spend RPC on coins that actually get traded).
+  // New pairs (pre-bond). Unchecked is the UNFILTERED firehose (every launch);
+  // the same gates as bonded then split them into Blocked / Tradable. Gating is
+  // the only RPC cost, so it's rate-limited (gatePerTick) and prioritises mcap.
   newPairs: {
     trackMs: num('NEWPAIRS_TRACK_MS', 30 * 60 * 1000),
     earlyWindowMs: num('NEWPAIRS_EARLY_WINDOW_MS', 60_000),
-    minMcapSolToWatch: num('NEWPAIRS_MIN_MCAP_SOL', 0), // entry floor from the create event (0 = watch all, capped)
-    minTradesToGate: num('NEWPAIRS_MIN_TRADES', 6),     // traction before spending RPC gating it
-    maxWatch: num('NEWPAIRS_MAX_WATCH', 300),           // cap concurrent trade subscriptions
-    pruneMs: num('NEWPAIRS_PRUNE_MS', 5 * 60 * 1000),   // drop no-traction coins after this
+    settleMs: num('NEWPAIRS_SETTLE_MS', 10_000),    // let a fresh launch index before gating
+    maxWatch: num('NEWPAIRS_MAX_WATCH', 300),       // rolling cap on tracked launches (newest win)
+    gatePerTick: num('NEWPAIRS_GATE_PER_TICK', 10), // max coins gated per 5s loop (RPC budget)
   },
 };
 

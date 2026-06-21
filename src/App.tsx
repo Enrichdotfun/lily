@@ -31,10 +31,14 @@ export function App() {
   //   blocked   — tripped a gate (bundle / rug / early-dump / crater), at any point
   //   tradable  — holder check ran AND nothing tripped
   //   unchecked — still pending the holder check, nothing tripped yet
+  // New pairs: Unchecked is the unfiltered firehose; gates split into Blocked /
+  // Tradable, and Tradable additionally hides anything under $3k mcap.
+  const NEW_TRADABLE_MIN_MC = 3000;
   const newAll = newFeed.data?.coins ?? [];
+  const isNewTradable = (c: BondedCoin) => c.checked && !c.hidden && (c.marketCapUsd ?? 0) >= NEW_TRADABLE_MIN_MC;
   const newBlocked = newAll.filter((c) => c.hidden);
-  const newTradable = newAll.filter((c) => c.checked && !c.hidden);
-  const newUnchecked = newAll.filter((c) => !c.checked && !c.hidden);
+  const newTradable = newAll.filter(isNewTradable);
+  const newUnchecked = newAll.filter((c) => !c.hidden && !isNewTradable(c));
   const newActive = newTab === 'unchecked' ? newUnchecked : newTab === 'blocked' ? newBlocked : newTradable;
 
   const bondAll = bondedFeed.data?.coins ?? [];
@@ -58,7 +62,11 @@ export function App() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: 12, boxSizing: 'border-box', background: '#07070b' }}>
-      <header style={{ marginBottom: 10, display: 'flex', alignItems: 'baseline', gap: 12 }}>
+      <header style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <a href="/" title="Back to Enrich"
+          style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(148,163,184,0.8)', textDecoration: 'none', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 8, padding: '4px 10px', whiteSpace: 'nowrap' }}>
+          ← Enrich
+        </a>
         <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
           <img src={`${import.meta.env.BASE_URL}lily.png`} alt="" width={24} height={24} style={{ borderRadius: 6, objectFit: 'cover' }} />
           Lily
@@ -94,9 +102,9 @@ export function App() {
         <Column
           title="New pairs" accent="rgba(125,211,252,0.9)"
           subtitle={
-            newTab === 'unchecked' ? 'Fresh launches still being checked.'
+            newTab === 'unchecked' ? 'Every new pump.fun launch, before gates.'
             : newTab === 'blocked' ? 'Launches that tripped a gate (bundle / rug / dump / crater).'
-            : 'Launches that passed every gate (bundle / rug / dump).'}
+            : 'Clean launches over $3k mcap.'}
           count={newActive.length} apiLoad={newFeed.data?.api}
           status={feedStatus(newFeed.data?.updatedAt, newFeed.error)}
           sortKey={newSort.key} sortDir={newSort.dir}

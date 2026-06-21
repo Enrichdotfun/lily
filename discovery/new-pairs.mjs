@@ -120,13 +120,10 @@ function flush() {
   const now = Date.now();
   for (const [mint, c] of board) {
     const age = now - c.launchedAt;
-    // drop: bonded (handed off), aged out, or never gained traction
-    const drop = c.bonded || age > N.trackMs || (age > N.pruneMs && c.trades < N.minTradesToGate && !c.checked);
-    if (drop) { board.delete(mint); portal.unwatchTrades(mint); }
+    if (c.bonded || age > N.trackMs) { board.delete(mint); portal.unwatchTrades(mint); } // handed off / aged out
   }
-  // surface coins with signs of life (a trade, a gate verdict, or fully checked)
+  // surface EVERY tracked launch -- the UI splits them into Unchecked / Blocked / Tradable
   const rows = [...board.values()]
-    .filter((c) => c.trades > 0 || c.checked || hideReason(c) != null)
     .map((c) => {
       const hr = hideReason(c);
       return {
@@ -166,9 +163,13 @@ const portal = new PumpPortal({
     // entry floor and the watch cap. Gating (RPC) waits for traction.
     if (m.txType === 'create' && !board.has(mint)) {
       stats.launchesSeen++;
-      const initMcap = m.marketCapSol ?? 0;
-      if (initMcap < N.minMcapSolToWatch) return;
-      if (board.size >= N.maxWatch) return; // at cap; the prune in flush() frees slots
+      // Unchecked is the UNFILTERED firehose: every new launch goes here. When the
+      // board is full, evict the oldest so we always show the freshest launches.
+      if (board.size >= N.maxWatch) {
+        let oldest = null, oldestT = Infinity;
+        for (const [mm, cc] of board) if (cc.launchedAt < oldestT) { oldest = mm; oldestT = cc.launchedAt; }
+        if (oldest) { board.delete(oldest); portal.unwatchTrades(oldest); }
+      }
       const c = {
         mint, name: m.name ?? null, symbol: m.symbol ?? null,
         launchedAt: Date.now(), lastTradeAt: Date.now(), trades: 0, volumeSol: 0,
@@ -226,13 +227,15 @@ for (const c of board.values()) portal.watchTrades(c.mint);
 flush();
 setInterval(flush, 4000);
 
-// Gate coins once they show traction (immediate, per the study config) -- this
-// is where RPC is spent, so it only runs for coins with real activity.
+// Run the SAME gates as bonded on every launch. Gating is where RPC is spent, so
+// it's rate-limited (gatePerTick per loop) and prioritises higher-mcap coins, but
+// every coin is eventually gated -> it moves from Unchecked to Blocked or Tradable.
 setInterval(() => {
   const now = Date.now();
-  for (const c of board.values()) {
-    if (!c.checked && !c.gating && c.trades >= N.minTradesToGate && now - (c.lastGate || 0) > 15000) gateCoin(c);
-  }
+  const eligible = [...board.values()]
+    .filter((c) => !c.checked && !c.gating && now - (c.lastGate || 0) > 15000 && now - c.launchedAt >= N.settleMs)
+    .sort((a, b) => (b.lastLevel || 0) - (a.lastLevel || 0));
+  for (const c of eligible.slice(0, N.gatePerTick)) gateCoin(c);
 }, 5000);
 
 // Keep mcap current + detect bonding for surfaced coins.
