@@ -7,13 +7,24 @@
 // ---------------------------------------------------------------------------
 
 export const THRESHOLDS = {
-  MIN_LAUNCH_TXNS: 50,        // a bonded coin with fewer lifetime txns than this was likely forced/bundled
+  BUNDLE_MAX_PER_SLOT: 8,     // >= this many opening txns in a SINGLE slot => bundled/sniped launch
   CREATOR_RETENTION_PCT: 10,  // creator still holding >= this % of supply => rug risk
   WHALE_FLOAT_PCT: 15,        // a single non-pool wallet holding >= this % => whale-float risk
   EARLY_DUMP_RET_PCT: -30,    // first-minute return <= this ...
   EARLY_DUMP_NET_SOL: -5,     // ... AND first-minute net flow <= this => early dump
   CRATER_DIP_PCT: -85,        // drawn down >= this far from ATH => dead/crater, hide it
 };
+
+/**
+ * Bundle verdict from launch-slot clustering. A bundled/sniped launch buys a big
+ * chunk of supply in the SAME slot as creation, so many opening txns share one
+ * slot. This is NOT "few transactions" — a young coin simply has few txns and is
+ * not bundled. Pass the opening-window maxPerSlot from launchTxnStats().
+ */
+export function bundleVerdict({ maxPerSlot }) {
+  if (typeof maxPerSlot === 'number' && maxPerSlot >= THRESHOLDS.BUNDLE_MAX_PER_SLOT) return 'bundle';
+  return null;
+}
 
 /** Holder verdict from on-chain holders. Returns a reason or null. */
 export function holderVerdict({ creatorPct, holderTop1 }) {

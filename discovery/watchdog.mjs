@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 import { config } from './lib/config.mjs';
 import { makeRpc, mineHolders } from './lib/rpc.mjs';
-import { holderVerdict, isCratered } from './lib/gates.mjs';
+import { bundleVerdict, holderVerdict, isCratered } from './lib/gates.mjs';
 import { getCoin } from './lib/pumpfun.mjs';
 import { writeSnapshot } from './lib/store.mjs';
 import { getCoins } from './lib/db.mjs';
@@ -24,15 +24,40 @@ const lastChecked = new Map(); // mint -> ts of last verification
 const quarantine = new Map();  // mint -> { reason, at, feed, ... }
 let verified = 0;
 
+function feedCoins(feed) {
+  const trackMs = (feed === 'new' ? config.newPairs : config.bonded).trackMs;
+  return getCoins(feed, trackMs) || [];
+}
+
 /** Coins the UI shows as Tradable for a feed. */
 function tradableOf(feed) {
-  const trackMs = (feed === 'new' ? config.newPairs : config.bonded).trackMs;
-  const coins = getCoins(feed, trackMs) || [];
-  return coins.filter((c) => {
+  return feedCoins(feed).filter((c) => {
     if (!c.checked || c.hidden) return false;
     if (feed === 'new' && (c.marketCapUsd ?? 0) < W.tradableMinMcUsd) return false;
     return true;
   });
+}
+
+/**
+ * Audit Blocked coins for FALSE blocks (good coins wrongly hidden). Cheap pass:
+ * re-checks the recorded block reason against the stored signals (no RPC) — e.g.
+ * a coin blocked as "bundle" whose maxPerSlot is actually below the threshold.
+ */
+function auditBlocked() {
+  const out = [];
+  for (const feed of ['new', 'bonded']) {
+    for (const c of feedCoins(feed)) {
+      if (!c.hidden) continue;
+      const r = c.hideReason || '';
+      let wrong = false, note = '';
+      if (r === 'bundle' || r === 'launch-slot-cluster' || r === 'few-launch-txns') {
+        wrong = bundleVerdict({ maxPerSlot: c.maxPerSlot }) == null; // not actually slot-clustered
+        note = `maxPerSlot=${c.maxPerSlot} txns=${c.launchTxns}`;
+      }
+      if (wrong) out.push({ mint: c.mint, feed, symbol: c.symbol ?? null, reason: r, note });
+    }
+  }
+  return out;
 }
 
 /** Independently re-verify one tradable coin. Returns a leak reason or null. */
@@ -77,6 +102,9 @@ async function tick() {
   for (const m of [...quarantine.keys()]) if (!live.has(m)) quarantine.delete(m);
   for (const m of [...lastChecked.keys()]) if (!live.has(m)) lastChecked.delete(m);
 
+  const falseBlocks = auditBlocked();
+  if (falseBlocks.length) console.log(`[watchdog] ${falseBlocks.length} FALSE-BLOCK(s), e.g. ${falseBlocks[0].symbol || falseBlocks[0].mint.slice(0, 8)} (${falseBlocks[0].reason}; ${falseBlocks[0].note})`);
+
   writeSnapshot('watchdog.json', {
     lastRun: now,
     tradableCount: tradable.length,
@@ -84,6 +112,8 @@ async function tick() {
     leakCount: quarantine.size,
     leaks: [...quarantine.entries()].map(([mint, v]) => ({ mint, ...v })),
     quarantine: [...quarantine.keys()],
+    falseBlockCount: falseBlocks.length,
+    falseBlocks: falseBlocks.slice(0, 50),
   });
 }
 

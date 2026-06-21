@@ -16,7 +16,7 @@
 import { config } from './lib/config.mjs';
 import { PumpPortal } from './lib/pumpportal.mjs';
 import { makeRpc, bondingCurvePda, launchTxnStats, mineHolders } from './lib/rpc.mjs';
-import { holderVerdict, earlyDumpVerdict, isCratered, THRESHOLDS } from './lib/gates.mjs';
+import { bundleVerdict, holderVerdict, earlyDumpVerdict, isCratered, THRESHOLDS } from './lib/gates.mjs';
 import { getCoin } from './lib/pumpfun.mjs';
 import { writeSnapshot } from './lib/store.mjs';
 import { load } from './lib/metrics.mjs';
@@ -98,9 +98,8 @@ async function gateCoin(c) {
     const launch = await launchTxnStats(rpc, pda, 20).catch(() => null);
     if (launch) {
       c.launchTxns = launch.count;
-      if (!launch.capped && launch.count < THRESHOLDS.MIN_LAUNCH_TXNS) {
-        c.bundled = true; c.bundleReason = 'few-launch-txns';
-      }
+      c.maxPerSlot = launch.maxPerSlot;
+      if (bundleVerdict({ maxPerSlot: launch.maxPerSlot })) { c.bundled = true; c.bundleReason = 'launch-slot-cluster'; }
     }
     const holders = await mineHolders(rpc, c.mint, meta?.creator).catch(() => ({}));
     c.holderTop1 = holders.holderTop1 ?? null;
@@ -133,7 +132,7 @@ function flush() {
         athMcapSol: c.athLevel, lastMcapSol: c.lastLevel,
         marketCapSol: c.lastLevel, marketCapUsd: c.marketCapUsd ?? null,
         dipPct: c.dipPct, maxDipPct: c.maxDipPct,
-        launchTxns: c.launchTxns,
+        launchTxns: c.launchTxns, maxPerSlot: c.maxPerSlot ?? null,
         checked: c.checked, bundled: c.bundled, rugFake: c.rugFake, rugReason: c.rugReason,
         earlyDumped: c.earlyDumped,
         holderTop1: c.holderTop1, holderTop10: c.holderTop10, creatorPct: c.creatorPct,
