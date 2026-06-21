@@ -61,9 +61,10 @@ function flush() {
       ageMs: now - c.bondedAt,
       trades: c.trades,
       volumeSol: c.volumeSol,
-      athMcapSol: c.athLevel,
+      athMcapSol: c.athLevel,   // NB: bonded levels are tracked in USD (see applyMcap)
       lastMcapSol: c.lastLevel,
       marketCapSol: c.lastLevel,
+      athMcapUsd: c.athLevel,   // explicit USD ath so the server doesn't ×solUsd it
       marketCapUsd: c.marketCapUsd ?? null,
       dipPct: c.dipPct,
       maxDipPct: c.maxDipPct,

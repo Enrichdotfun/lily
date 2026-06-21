@@ -50,7 +50,7 @@ function enrichCoin(c, solUsd) {
   return {
     ...c,
     marketCapUsd: c.marketCapUsd ?? (c.marketCapSol != null && solUsd ? c.marketCapSol * solUsd : null),
-    athMcapUsd: c.athMcapSol != null && solUsd ? c.athMcapSol * solUsd : null,
+    athMcapUsd: c.athMcapUsd ?? (c.athMcapSol != null && solUsd ? c.athMcapSol * solUsd : null),
     volumeUsd: c.volumeSol != null && solUsd ? c.volumeSol * solUsd : null,
   };
 }
