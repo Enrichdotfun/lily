@@ -21,13 +21,18 @@ export function App() {
 
   const [oldSort, setOldSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'vol', dir: 'desc' });
   const [bondSort, setBondSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'age', dir: 'asc' });
-  const [bondTab, setBondTab] = useState<'unchecked' | 'tradable'>('tradable');
+  const [bondTab, setBondTab] = useState<'unchecked' | 'tradable' | 'blocked'>('tradable');
 
   const oldCoins = oldFeed.data?.coins ?? [];
   const bondAll = bondedFeed.data?.coins ?? [];
-  // Tradable = gates actually ran (checked) AND nothing tripped.
+  // Three mutually-exclusive states a graduate flows through:
+  //   blocked   — tripped a gate (bundle / rug / early-dump / crater), at any point
+  //   tradable  — holder check ran AND nothing tripped
+  //   unchecked — still pending the holder check, nothing tripped yet
+  const bondBlocked = bondAll.filter((c) => c.hidden);
   const bondTradable = bondAll.filter((c) => c.checked && !c.hidden);
-  const bondActive = bondTab === 'unchecked' ? bondAll : bondTradable;
+  const bondUnchecked = bondAll.filter((c) => !c.checked && !c.hidden);
+  const bondActive = bondTab === 'unchecked' ? bondUnchecked : bondTab === 'blocked' ? bondBlocked : bondTradable;
 
   const oldSorted = sortCoins(oldCoins, oldSort.key, oldSort.dir,
     (c, k) => k === 'age' ? c.ageMs : k === 'mc' ? (c.marketCapUsd ?? 0) : c.recentTrades);
@@ -81,16 +86,21 @@ export function App() {
         {/* ---------- BONDED (Unchecked | Tradable) ---------- */}
         <Column
           title="Bonded" accent="rgba(74,222,128,0.9)"
-          subtitle={bondTab === 'unchecked'
-            ? 'Every fresh graduate, including gated ones.'
+          subtitle={
+            bondTab === 'unchecked' ? 'Fresh graduates still being checked.'
+            : bondTab === 'blocked' ? 'Graduates that tripped a gate (bundle / rug / dump / crater).'
             : 'Graduates that passed every gate (bundle / rug / dump).'}
           count={bondActive.length} apiLoad={bondedFeed.data?.api}
           status={feedStatus(bondedFeed.data?.updatedAt, bondedFeed.error)}
           sortKey={bondSort.key} sortDir={bondSort.dir}
           sortOptions={[{ key: 'age', label: 'Age' }, { key: 'mc', label: 'MC' }, { key: 'vol', label: 'Vol' }]}
           onSortKey={(k) => setBondSort((s) => ({ ...s, key: k }))} onSortDir={(d) => setBondSort((s) => ({ ...s, dir: d }))}
-          tabs={[{ key: 'unchecked', label: 'Unchecked', count: bondAll.length }, { key: 'tradable', label: 'Tradable', count: bondTradable.length }]}
-          activeTab={bondTab} onTab={(k) => setBondTab(k as 'unchecked' | 'tradable')}
+          tabs={[
+            { key: 'unchecked', label: 'Unchecked', count: bondUnchecked.length },
+            { key: 'tradable', label: 'Tradable', count: bondTradable.length },
+            { key: 'blocked', label: 'Blocked', count: bondBlocked.length },
+          ]}
+          activeTab={bondTab} onTab={(k) => setBondTab(k as 'unchecked' | 'tradable' | 'blocked')}
         >
           {bondSorted.map((c) => {
             const stats: Stat[] = [
