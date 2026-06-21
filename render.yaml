@@ -1,0 +1,27 @@
+# Render blueprint — the backend web service (API + Old/Bonded discovery daemons).
+# The frontend (static UI) is deployed separately on Vercel and served at
+# enrich.fun/lily; see DEPLOY.md for that recipe (and the Railway alternative).
+services:
+  # ---- Backend: API + Old/Bonded discovery daemons ----
+  - type: web
+    name: lily-api
+    runtime: node
+    plan: starter            # a disk (below) needs a paid plan; see DEPLOY.md for the free/ephemeral option
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: lily-data
+      mountPath: /data       # persistent volume for SQLite
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /data/lily.db
+      - key: SOLANA_RPC_URL
+        sync: false          # set your RPC URL in the dashboard (do NOT commit it)
+      - key: PUMPPORTAL_WS_URL
+        value: wss://pumpportal.fun/api/data
+      - key: LILY_API_KEYS
+        sync: false          # optional: comma-separated keys to gate the public API
+      - key: RATE_LIMIT_PER_MIN
+        value: "240"

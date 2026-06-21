@@ -1,0 +1,3 @@
+# better-sqlite3 builds a native addon — node-gyp needs python3 + a C/C++ toolchain.
+[phases.setup]
+nixPkgs = ["...", "python3", "gcc", "gnumake"]
