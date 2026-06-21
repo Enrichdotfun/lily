@@ -1,5 +1,7 @@
 // Token avatar: real image if we have one, otherwise a deterministic colour tile
 // derived from the mint so each coin is visually stable.
+import { useEffect, useState } from 'react';
+
 function hue(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
@@ -12,15 +14,21 @@ export function Avatar({ mint, symbol, image, size = 36 }: {
   image?: string | null;
   size?: number;
 }) {
-  if (image) {
+  // Track load failures so a broken/slow image host (IPFS, dead CDN, hotlink
+  // block) falls back to the colour tile instead of leaving a blank gap.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [image]); // reset when the src changes
+
+  if (image && !failed) {
     return (
       <img
         src={image}
         alt={symbol || mint}
         width={size}
         height={size}
-        style={{ borderRadius: 10, objectFit: 'cover', flex: 'none' }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        loading="lazy"
+        style={{ borderRadius: 10, objectFit: 'cover', flex: 'none', width: size, height: size }}
+        onError={() => setFailed(true)}
       />
     );
   }
