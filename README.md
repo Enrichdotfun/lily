@@ -15,16 +15,15 @@ placement, no financial advice anywhere in this repo.
 ┌────────────────────┬────────────────────┬────────────────────┐
 │   Old pre-bond     │     New pairs       │      Bonded        │
 │                    │                     │                    │
-│ older, un-bonded   │   🔒 private —      │ freshly graduated  │
-│ coins that just    │   not part of the   │ coins, gated for   │
-│ took fresh bids    │   open-source repo  │ bundles / rug      │
-│ again              │                     │ holders / dumps    │
+│ older, un-bonded   │ fresh launches,     │ freshly graduated  │
+│ coins that just    │ gated live for      │ coins, gated for   │
+│ took fresh bids    │ bundles / rug       │ bundles / rug      │
+│ again              │ holders / dumps     │ holders / dumps    │
 └────────────────────┴────────────────────┴────────────────────┘
 ```
 
-> **Note:** the **New pairs / pre-bond discovery + gating is kept private** and is
-> not included in this open-source build. The UI shows that column as
-> "Unavailable in the public repo".
+New pairs and Bonded share one gate pipeline, and each coin flows through three
+mutually-exclusive states — **Unchecked → Blocked → Tradable**.
 
 ## The feeds
 
@@ -34,12 +33,19 @@ taking bids again. Lily lists tokens that are **old enough**, **still un-bonded*
 and have logged a **burst of recent on-chain activity** (measured with a key-less
 RPC signature probe).
 
+### New pairs — gated fresh launches
+Brand-new pump.fun launches, tracked live on their pre-bond trade tape. Launches
+are a firehose, so cost is bounded: Lily caps how many it watches at once and only
+spends RPC **gating coins that show real traction**. Survivors run the *same* gates
+as Bonded. A coin leaves this column when it bonds (it then appears in Bonded).
+
 ### Bonded — gated graduates
 Coins that bond (migrate to an AMM) are tracked live for market cap, all-time high
 and drawdown, and gated for **bundles**, **rug holders** (whale-float /
 creator-retention), **early dumps** (deeply negative first-minute return *and* net
-flow), and **craters**. Two tabs: **Unchecked** (every graduate) and **Tradable**
-(only those that passed every gate). Gate thresholds live in
+flow), and **craters**. Three tabs reflect each coin's state — **Unchecked**
+(pending), **Blocked** (tripped a gate), **Tradable** (passed every gate). Gate
+thresholds live in
 [`discovery/lib/gates.mjs`](discovery/lib/gates.mjs) as documented, tunable
 constants — verify them on your own data.
 
